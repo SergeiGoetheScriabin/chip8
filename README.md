@@ -1,31 +1,101 @@
-## so far we need to implement
+# chip8 emulator
+---
 
-- **Memory**  
-  CHIP-8 has 4096 bytes (4 KB) of RAM
+## what it is
 
-- **Display**  
-  64 x 32 monochrome screen
+chip8 is a tiny vm.
 
-- **Program Counter (pc)**  
-  points to the current instruction in memory
+you:
+- load a rom into memory
+- execute instructions one at a time
+- update cpu state (registers, stack, etc.)
+- draw to a 64x32 screen
 
-- **Index Register (I)**  
-  points to locations in memory (mainly for sprites / data)
+simple idea, but a lot going on once you actually start implementing it.
 
-- **Stack**  
-  stores 16-bit return addresses for subroutines (call/return)
+---
 
-- **Delay Timer**  
-  counts down at 60Hz
+## current state
 
-- **Sound Timer**  
-  same as delay timer, but when > 0 it triggers a beep
+### memory
+- 4kb ram (4096 bytes)
+- rom loads into memory starting at 0x200
 
-- **Registers (V0 - VF)**  
-  16 general purpose 8-bit registers  
-  VF is usually used as a flag (collision, carry, etc.)
+### cpu
+- pc -> current instruction
+- I -> index register (memory pointer, mainly for sprites)
+- stack → handles calls / returns (16 levels)
 
-- **Fontset**  
-  built-in sprite data for hex characters (0-F)  
-  TODO: https://github.com/mattmikolay/chip-8/issues/3  
-  (might let user swap/customize fonts later)
+### registers
+- V0–VF (8-bit registers)
+- VF used as a flag (collision, carry, etc.)
+
+### display
+- 64x32 framebuffer
+- each pixel is 0 or 1
+- drawing is basically XOR on pixels
+
+### timers
+- delay timer @ 60hz
+- sound timer triggers beep when > 0
+
+### fontset
+- built-in hex sprites (0-F)
+- loaded into memory at startup
+- might let user swap/customize fonts later
+
+---
+
+## opcodes implemented so far
+
+- 00E0 -> clear screen
+- 1NNN -> jump
+- 6XNN -> set register
+- 7XNN -> add to register
+- DXYN -> draw sprite
+
+
+---
+## op codes needed to implement
+
+### control flow
+-2NNN -> call subroutine (push pc, jump to NNN)
+-00EE -> return from subroutine (pop program counter)
+
+### conditionals (game logic)
+-3XNN -> skip if VX = NN
+-4XNN -> skip if VX != NN
+-5XY0 -> skip if VX == VY
+-9XY0 -> skip if VX != VY
+
+### input (keyboard)
+-EX9E -> skip if key VX is pressed
+-EXA1 -> skip if key VX is not pressed
+
+### timers / system
+-FX07 -> VX = delay timer
+-FX15 -> delay timer = VX
+-FX18 -> sound timer = VX
+
+### memory / utils
+-ANNN -> I = NNN
+-FX1E -> I += VX
+-FX29 -> I = sprite for VX (font lookup)
+-FX33 -> store BCD of VX in memory[I]
+-FX55 -> store V0-VX in memory[I]
+-FX65 -> load V0-VX in memory[I]
+
+## roms
+
+testing with basic roms like:
+- ibm logo
+
+just to make sure rendering + opcode flow is correct
+
+---
+
+## build
+
+```bash
+make
+./chip8 roms/ibm_logo.ch8

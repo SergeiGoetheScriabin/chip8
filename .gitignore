@@ -1,0 +1,9 @@
+# binaries
+chip8
+*.out
+
+# object files
+*.o
+
+# macOS
+.DS_Store

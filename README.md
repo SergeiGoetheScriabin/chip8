@@ -50,6 +50,8 @@ basic flow:
 
 - 00E0 -> clear screen
 
+- 00EE -> return from subroutine (pop program counter)
+
 - 1NNN -> jump
 
 - 6XNN -> set register
@@ -58,23 +60,21 @@ basic flow:
 
 - DXYN -> draw sprite
 
+- 3XNN -> skip if VX = NN
+
+- 4XNN -> skip if VX != NN
+
+- 5XY0 -> skip if VX == VY
+
+- 9XY0 -> skip if VX != VY
+
+- ANNN -> I = NNN
+
+- 2NNN -> call subroutine (push pc, jump to NNN)
 
 ---
 ## op codes needed to implement
 
-### control flow
--2NNN -> call subroutine (push pc, jump to NNN)
-
--00EE -> return from subroutine (pop program counter)
-
-### conditionals (game logic)
--3XNN -> skip if VX = NN
-
--4XNN -> skip if VX != NN
-
--5XY0 -> skip if VX == VY
-
--9XY0 -> skip if VX != VY
 
 ### input (keyboard)
 -EX9E -> skip if key VX is pressed
@@ -89,7 +89,7 @@ basic flow:
 -FX18 -> sound timer = VX
 
 ### memory / utils
--ANNN -> I = NNN
+
 
 -FX1E -> I += VX
 
@@ -116,3 +116,4 @@ just to make sure rendering + opcode flow is correct
 ```bash
 make
 ./chip8 roms/ibm_logo.ch8
+

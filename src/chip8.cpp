@@ -44,36 +44,101 @@ void Chip8::loadROM(const std::string& filename) {
 }
 
 void Chip8::exec_opcode(uint16_t opcode) {
-
-    switch (opcode & 0xF000) {
-
-        case 0x1000: // JMP
+    
+    switch(opcode & 0xF000) {
+        // 00E0 / 00EE
+        case 0x0000:
+            if(opcode == 0x00E0) {
+                gfx.fill(0);
+            }
+            else if(opcode == 0x00EE) {
+               // ret from subroutine // 00EE
+               sp--;
+               pc = stack[sp];
+               return;
+            }
+           break;
+        // 1NN - jump
+        case 0x1000:
+           pc = opcode & 0x0FFF;
+           return;
+        // 2NN - call subroutine
+        case 0x2000: {
+            stack[sp] = pc + 2;
+            sp++;
             pc = opcode & 0x0FFF;
-            return;
-
-        case 0xA000: // LD I
-            I = opcode & 0x0FFF;
+            return; // overrride pc +=2
+        }
+        case 0x3000: {
+            uint8_t x = (opcode & 0x0F00) >> 8;
+            uint8_t nn = opcode & 0x00FF;
+            
+            if(V[x] == nn) { 
+                pc += 2;
+            }
             break;
-
-        case 0x6000: // LD VX
-            V[(opcode & 0x0F00) >> 8] = opcode & 0x00FF;
+        } 
+           
+        
+        case 0x4000: {
+            uint8_t x = (opcode & 0x0F00) >> 8;
+            uint8_t nn = opcode & 0x00FF;
+            
+            if(V[x] != nn) {
+                pc += 2;
+            }
             break;
-
-        case 0x7000: // ADD VX
-            V[(opcode & 0x0F00) >> 8] += opcode & 0x00FF;
-            break;
-
-        case 0xD000: { // DRAW
+        }
+        // 5xy0 skip if vx == vy 
+        case 0x5000: {
             uint8_t x = (opcode & 0x0F00) >> 8;
             uint8_t y = (opcode & 0x00F0) >> 4;
-            uint8_t n = opcode & 0x000F;
 
+            if(V[x] == V[y]) {
+                pc += 2;
+            }
+            break;
+        }
+                     
+        // 6xnn - set VX
+        case 0x6000: {
+            uint8_t x = (opcode & 0x0F00) >> 8;
+            uint8_t n = opcode & 0x00FF;
+            V[x] = n;
+            break;
+        }
+        // 7xnn - add VX
+        case 0x7000: {
+            uint8_t x = (opcode & 0x0F00) >> 8;
+            uint8_t n = opcode & 0x00FF;
+            V[x] += n;
+            break;
+        }
+        // 9xy0 - skip if vx != vy
+        case 0x9000: {
+            uint8_t x = (opcode & 0x0F00) >> 8;
+            uint8_t y = (opcode & 0x00F0) >> 4;
+
+            if(V[x] != V[y]) {
+                pc += 2;
+            }
+            break;
+        }
+        // ANNN - set I
+        case 0xA000:
+            I = opcode & 0x0FFF;
+            break;
+        // DXYN - draw sprite
+        case 0xD000: {
+            uint8_t x = (opcode & 0X0F00) >> 8;
+            uint8_t y = (opcode & 0X00F0) >> 4;
+            uint8_t n = (opcode & 0x000F);
+            
             uint8_t xPos = V[x];
             uint8_t yPos = V[y];
 
             V[0xF] = 0;
-
-            for (int row = 0; row < n; row++) {
+			for(int row = 0; row < n; row++) {
                 uint8_t sprite = memory[I + row];
 
                 for (int col = 0; col < 8; col++) {
@@ -93,18 +158,17 @@ void Chip8::exec_opcode(uint16_t opcode) {
             break;
         }
 
-        case 0x0000:
-            if (opcode == 0x00E0)
-                gfx.fill(0);
-            break;
-
         default:
             break;
     }
 
-    // default instruction step
+    // =========================
+    // normal instruction step
+    // =========================
     pc += 2;
 }
+            
+                   
 
 void Chip8::cycle() {
 

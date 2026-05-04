@@ -19,6 +19,7 @@ simple idea, but a lot going on once you actually start implementing it.
 
 ### memory
 - 4kb ram (4096 bytes)
+
 - rom loads into memory starting at 0x200
 
 ### cpu
@@ -49,9 +50,13 @@ simple idea, but a lot going on once you actually start implementing it.
 ## opcodes implemented so far
 
 - 00E0 -> clear screen
+
 - 1NNN -> jump
+
 - 6XNN -> set register
+
 - 7XNN -> add to register
+
 - DXYN -> draw sprite
 
 
@@ -60,29 +65,42 @@ simple idea, but a lot going on once you actually start implementing it.
 
 ### control flow
 -2NNN -> call subroutine (push pc, jump to NNN)
+
 -00EE -> return from subroutine (pop program counter)
 
 ### conditionals (game logic)
 -3XNN -> skip if VX = NN
+
 -4XNN -> skip if VX != NN
+
 -5XY0 -> skip if VX == VY
+
 -9XY0 -> skip if VX != VY
 
 ### input (keyboard)
 -EX9E -> skip if key VX is pressed
+
 -EXA1 -> skip if key VX is not pressed
 
 ### timers / system
 -FX07 -> VX = delay timer
+
 -FX15 -> delay timer = VX
+
 -FX18 -> sound timer = VX
 
 ### memory / utils
 -ANNN -> I = NNN
+
 -FX1E -> I += VX
+
 -FX29 -> I = sprite for VX (font lookup)
+
 -FX33 -> store BCD of VX in memory[I]
+
 -FX55 -> store V0-VX in memory[I]
+
+
 -FX65 -> load V0-VX in memory[I]
 
 ## roms

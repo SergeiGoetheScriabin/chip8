@@ -5,13 +5,12 @@
 
 chip8 is a tiny vm.
 
-you:
+basic flow:
 - load a rom into memory
 - execute instructions one at a time
 - update cpu state (registers, stack, etc.)
 - draw to a 64x32 screen
 
-simple idea, but a lot going on once you actually start implementing it.
 
 ---
 

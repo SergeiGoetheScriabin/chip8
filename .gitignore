@@ -1,9 +1,14 @@
-# binaries
+# binary
 chip8
 *.out
 
 # object files
 *.o
+
+# vim swap files
+*.swp
+*.swo
+*.swn
 
 # macOS
 .DS_Store

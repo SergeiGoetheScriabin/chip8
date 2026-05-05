@@ -84,6 +84,8 @@ void Chip8::exec_opcode(uint16_t opcode) {
         // EX9E / EXA1 - keyboard input
         case 0xE000: handleKeyInput(opcode); break;
 
+        case 0xF000: handleFGroup(opcode); break;
+
         default:
             break;
     }
@@ -100,6 +102,25 @@ inline void Chip8::handle0Group(uint16_t opcode) {
        sp--;
        pc = stack[sp];
        return; // one of only cases we override pc in main loop.
+    }
+}
+
+inline void Chip8::handleFGroup(uint16_t opcode) {
+
+    switch(opcode & 0x00FF) {
+
+        case 0x07: setVXToDelayTimer(opcode); break;
+        case 0x15: setDelayTimerFromVX(opcode); break;
+        case 0x18: setSoundTimerFromVX(opcode); break;
+
+        case 0x1E: addVXToIndex(opcode); break;
+        case 0x29: setIndexToFontSpriteForVX(opcode); break;
+        case 0x33: storeVXAsBCD(opcode); break;
+        case 0x55: storeV0ToVXToMemory(opcode); break;
+        case 0x65: loadV0ToVXFromMemory(opcode); break;
+
+        default:
+            break;
     }
 }
 
@@ -135,7 +156,7 @@ inline void Chip8::handleSkipIfRegisterEqual(uint16_t opcode) {
 
     if(V[x] == V[y]) pc += 2;
 }
-void Chip8::handleSkipIfRegisterNotEqual(uint16_t opcode) {
+inline void Chip8::handleSkipIfRegisterNotEqual(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t y = (opcode & 0x00F0) >> 4;
     
@@ -147,7 +168,9 @@ inline void Chip8::handleSetIndex(uint16_t opcode) {
 }
 
 
-void Chip8::handleSkipIfEqualByte(uint16_t opcode) {
+
+
+inline void Chip8::handleSkipIfEqualByte(uint16_t opcode) {
     uint8_t x  = (opcode & 0x0F00) >> 8;
     uint8_t nn = opcode & 0x00FF;
 
@@ -155,7 +178,7 @@ void Chip8::handleSkipIfEqualByte(uint16_t opcode) {
         pc += 2;
     }
 }
-void Chip8::handleSkipIfNotEqualByte(uint16_t opcode) {
+inline void Chip8::handleSkipIfNotEqualByte(uint16_t opcode) {
     uint8_t x  = (opcode & 0x0F00) >> 8;
     uint8_t nn = opcode & 0x00FF;
 
@@ -164,7 +187,7 @@ void Chip8::handleSkipIfNotEqualByte(uint16_t opcode) {
     }
 }
 
-void Chip8::handleKeyInput(uint16_t opcode) {
+inline void Chip8::handleKeyInput(uint16_t opcode) {
     switch (opcode & 0x00FF) {
 
        case 0x9E: SkipKeyIfVXIsPressed(opcode); break;
@@ -172,7 +195,7 @@ void Chip8::handleKeyInput(uint16_t opcode) {
     }
 }
 
-void Chip8::SkipKeyIfVXIsPressed(uint16_t opcode) {
+inline void Chip8::SkipKeyIfVXIsPressed(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
 
     if(keypad[V[x]]) {
@@ -180,7 +203,7 @@ void Chip8::SkipKeyIfVXIsPressed(uint16_t opcode) {
     }
 }
 
-void Chip8::SkipKeyIfVXIsNotPressed(uint16_t opcode) {
+inline void Chip8::SkipKeyIfVXIsNotPressed(uint16_t opcode) {
     uint8_t x = (opcode & 0x0F00) >> 8;
     if(!keypad[V[x]]) {
         pc += 2;
@@ -188,7 +211,7 @@ void Chip8::SkipKeyIfVXIsNotPressed(uint16_t opcode) {
 }
 
 
-void Chip8::DrawToScreen(uint16_t opcode) {
+inline void Chip8::DrawToScreen(uint16_t opcode) {
     // 0xD000
     uint8_t x = (opcode & 0X0F00) >> 8;
     uint8_t y = (opcode & 0X00F0) >> 4;
@@ -218,6 +241,64 @@ void Chip8::DrawToScreen(uint16_t opcode) {
     }
 }
 
+
+// fx07 delay timer
+inline void Chip8::setVXToDelayTimer(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    V[x] = delay_timer;
+}
+
+// fx15 delay timer
+inline void Chip8::setDelayTimerFromVX(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    delay_timer = V[x];
+}
+
+// fx 18 delay timer
+inline void Chip8::setSoundTimerFromVX(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    sound_timer = V[x];
+}
+
+// fx1e - i += vx
+inline void Chip8::addVXToIndex(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    I += V[x];
+}
+
+// fx 29  - font sprite address
+inline void Chip8::setIndexToFontSpriteForVX(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    I = 0x50 + (V[x] * 5);
+}
+
+// fx 33 - bcd store
+inline void Chip8::storeVXAsBCD(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t value = V[x];
+
+    memory[I]     = value / 100;
+    memory[I + 1] = (value / 10) % 10;
+    memory[I + 2] = value % 10;
+}
+
+// fx 55 - store V0-VX in memory
+inline void Chip8::storeV0ToVXToMemory(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+
+    for (int i = 0; i <= x; i++) {
+        memory[I + i] = V[i];
+    }
+}
+
+// fx 65 - load v0-vx from memory
+inline void Chip8::loadV0ToVXFromMemory(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+
+    for (int i = 0; i <= x; i++) {
+        V[i] = memory[I + i];
+    }
+}
 
 void Chip8::cycle() {
 

@@ -10,27 +10,52 @@ class Chip8 {
 public:
     Chip8();
 
+    // emulator core
     void init();
     void loadROM(const std::string& filename);
     void cycle();
     void debug_render();
-    // for opcodes
+    
+    //opcodes 
+    void handle0Group(uint16_t opcode);
     void handleJump(uint16_t opcode);
     void handleSubRoutine(uint16_t opcode);
+
     void handleSkipIfEqualByte(uint16_t opcode);
     void handleSkipIfNotEqualByte(uint16_t opcode);
     void handleSkipIfRegisterEqual(uint16_t opcode);
+    void handleSkipIfRegisterNotEqual(uint16_t opcode);
+    
+    // registers/alu
     void handleSetRegister(uint16_t opcode);
     void handleAddToRegister(uint16_t opcode);
-    void handle0Group(uint16_t opcode);
-    void handleSkipIfRegisterNotEqual(uint16_t opcode);
-    void handleSetIndex(uint16_t opcode);
+    
+    // memory index (i register)
+    void handleSetIndex(uint16_t opcode);    
+    
+    // display
     void DrawToScreen(uint16_t opcode);
+
+    // input
     void handleKeyInput(uint16_t opcode);
     void SkipKeyIfVXIsPressed(uint16_t opcode);
     void SkipKeyIfVXIsNotPressed(uint16_t opcode);
     void WaitForKeyPress(uint16_t opcode);
     
+    // fx group calls
+    void handleFGroup(uint16_t opcode);
+
+    // timers
+    void setVXToDelayTimer(uint16_t opcode);
+    void setDelayTimerFromVX(uint16_t opcode);
+    void setSoundTimerFromVX(uint16_t opcode);
+    
+    // memory utils
+    void addVXToIndex(uint16_t opcode);
+    void setIndexToFontSpriteForVX(uint16_t opcode); 
+    void storeVXAsBCD(uint16_t opcode);
+    void storeV0ToVXToMemory(uint16_t opcode); 
+    void loadV0ToVXFromMemory(uint16_t opcode);
 
 
 

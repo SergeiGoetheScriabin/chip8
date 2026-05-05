@@ -57,8 +57,7 @@ public:
     void storeV0ToVXToMemory(uint16_t opcode); 
     void loadV0ToVXFromMemory(uint16_t opcode);
 
-
-
+    
     static constexpr std::size_t SCREEN_WIDTH = 64;
     static constexpr std::size_t SCREEN_HEIGHT = 32;
     static constexpr std::size_t SCREEN_SIZE = SCREEN_HEIGHT * SCREEN_WIDTH;

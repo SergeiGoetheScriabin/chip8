@@ -2,8 +2,6 @@
 #include <fstream>
 #include <iostream>
 
-
-
 void Chip8::init() {
     pc = 0x200;
     I = 0;
@@ -18,13 +16,15 @@ void Chip8::init() {
     delay_timer = 0;
     sound_timer = 0;
 
-    // load fontset into memory
+    // load fontset into memory, starts at 0x50.
     for (size_t i = 0; i < fontset.size(); i++) {
         memory[0x50 + i] = fontset[i];
     }
 }
 
 void Chip8::loadROM(const std::string& filename) {
+    // [ 0x000 - 0x1FF ] -> FONTS/INTERPRETER BYTES
+    // [ 0x200 - 0xFFF ] -> ROM BYTES
     std::ifstream file(filename, std::ios::binary);
 
     if (!file) {
@@ -32,143 +32,192 @@ void Chip8::loadROM(const std::string& filename) {
         return;
     }
 
-    file.read(reinterpret_cast<char*>(&memory[0x200]), MEMORY_SIZE - 0x200);
+    //copy bytes from the ROM file directly into CHIP-8 RAM starting at 0x200, only if we are in bounds.
+    file.read(reinterpret_cast<char*>(&memory[0x200]), MEMORY_SIZE - 0x200); 
 
     if (file.gcount() == 0) {
         std::cout << "ROM is empty\n";
         return;
     }
 
-    pc = 0x200;
+    pc = 0x200; //  program counter starts at 0x200.
     rom_loaded = true;
 }
 
 void Chip8::exec_opcode(uint16_t opcode) {
-    
+
     switch(opcode & 0xF000) {
+
         // 00E0 / 00EE
-        case 0x0000:
-            if(opcode == 0x00E0) {
-                gfx.fill(0);
-            }
-            else if(opcode == 0x00EE) {
-               // ret from subroutine // 00EE
-               sp--;
-               pc = stack[sp];
-               return;
-            }
-           break;
-        // 1NN - jump
-        case 0x1000:
-           pc = opcode & 0x0FFF;
-           return;
-        // 2NN - call subroutine
-        case 0x2000: {
-            stack[sp] = pc + 2;
-            sp++;
-            pc = opcode & 0x0FFF;
-            return; // overrride pc +=2
-        }
-        case 0x3000: {
-            uint8_t x = (opcode & 0x0F00) >> 8;
-            uint8_t nn = opcode & 0x00FF;
-            
-            if(V[x] == nn) { 
-                pc += 2;
-            }
-            break;
-        } 
-           
+        case 0x0000: handle0Group(opcode); break;
         
-        case 0x4000: {
-            uint8_t x = (opcode & 0x0F00) >> 8;
-            uint8_t nn = opcode & 0x00FF;
-            
-            if(V[x] != nn) {
-                pc += 2;
-            }
-            break;
-        }
-        // 5xy0 skip if vx == vy 
-        case 0x5000: {
-            uint8_t x = (opcode & 0x0F00) >> 8;
-            uint8_t y = (opcode & 0x00F0) >> 4;
+        // 1NNN - JP addr: unconditional jump to address NNN
+        case 0x1000: handleJump(opcode); break;
 
-            if(V[x] == V[y]) {
-                pc += 2;
-            }
-            break;
-        }
-                     
-        // 6xnn - set VX
-        case 0x6000: {
-            uint8_t x = (opcode & 0x0F00) >> 8;
-            uint8_t n = opcode & 0x00FF;
-            V[x] = n;
-            break;
-        }
-        // 7xnn - add VX
-        case 0x7000: {
-            uint8_t x = (opcode & 0x0F00) >> 8;
-            uint8_t n = opcode & 0x00FF;
-            V[x] += n;
-            break;
-        }
-        // 9xy0 - skip if vx != vy
-        case 0x9000: {
-            uint8_t x = (opcode & 0x0F00) >> 8;
-            uint8_t y = (opcode & 0x00F0) >> 4;
+        // 2NN - call subroutine
+        case 0x2000: handleSubRoutine(opcode); break;
 
-            if(V[x] != V[y]) {
-                pc += 2;
-            }
-            break;
-        }
-        // ANNN - set I
-        case 0xA000:
-            I = opcode & 0x0FFF;
-            break;
+        // 3XNN - Skip if Vx equals a number.
+        case 0x3000: handleSkipIfEqualByte(opcode); break;
+
+        // 4XNN - skip next instruction if Vx does NOT equal a number
+        case 0x4000: handleSkipIfNotEqualByte(opcode); break;
+        
+        // 5XY0 - skip next instruction if Vx equals Vy
+        case 0x5000: handleSkipIfRegisterEqual(opcode); break;
+
+        // 6XNN - set Vx to a number
+        case 0x6000: handleSetRegister(opcode); break;
+           
+        // 7XNN - add a number to Vx
+        case 0x7000: handleAddToRegister(opcode); break;
+
+        // 9XY0 - skip next instruction if Vx does NOT equal Vy
+        case 0x9000: handleSkipIfRegisterNotEqual(opcode); break;
+           
+        // ANNN - set I to an address
+        case 0xA000: handleSetIndex(opcode); break;
+
         // DXYN - draw sprite
-        case 0xD000: {
-            uint8_t x = (opcode & 0X0F00) >> 8;
-            uint8_t y = (opcode & 0X00F0) >> 4;
-            uint8_t n = (opcode & 0x000F);
-            
-            uint8_t xPos = V[x];
-            uint8_t yPos = V[y];
+        case 0xD000: DrawToScreen(opcode); break;
 
-            V[0xF] = 0;
-			for(int row = 0; row < n; row++) {
-                uint8_t sprite = memory[I + row];
-
-                for (int col = 0; col < 8; col++) {
-                    if (sprite & (0x80 >> col)) {
-
-                        int px = (xPos + col) % SCREEN_WIDTH;
-                        int py = (yPos + row) % SCREEN_HEIGHT;
-                        int idx = px + py * SCREEN_WIDTH;
-
-                        if (gfx[idx])
-                            V[0xF] = 1;
-
-                        gfx[idx] ^= 1;
-                    }
-                }
-            }
-            break;
-        }
+        // EX9E / EXA1 - keyboard input
+        case 0xE000: handleKeyInput(opcode); break;
 
         default:
             break;
     }
-
-    // =========================
-    // normal instruction step
-    // =========================
     pc += 2;
 }
-            
-                   
+
+// 00E0 / 00EE
+inline void Chip8::handle0Group(uint16_t opcode) {
+    if(opcode == 0x00E0) {
+        gfx.fill(0); // clear screen by setting all pixels to 0.
+    }
+    else if(opcode == 0x00EE) {
+       // 00EE - RET: return from subroutine
+       sp--;
+       pc = stack[sp];
+       return; // one of only cases we override pc in main loop.
+    }
+}
+
+
+inline void Chip8::handleJump(uint16_t opcode) {
+    pc = opcode & 0x0FFF; // 12 bit address.
+}
+
+
+inline void Chip8::handleSubRoutine(uint16_t opcode) {
+    stack[sp] = pc + 2;
+    sp++;
+    pc = opcode & 0x0FFF; // 12 bit address.
+}
+
+inline void Chip8::handleSetRegister(uint16_t opcode) {
+     uint8_t x = (opcode & 0x0F00) >> 8;
+     uint8_t n = opcode & 0x00FF;
+     
+     V[x] = n;
+}
+
+inline void Chip8::handleAddToRegister(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t n = opcode & 0x00FF;
+    
+    V[x] += n;
+}
+
+inline void Chip8::handleSkipIfRegisterEqual(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t y = (opcode & 0x00F0) >> 4;
+
+    if(V[x] == V[y]) pc += 2;
+}
+void Chip8::handleSkipIfRegisterNotEqual(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t y = (opcode & 0x00F0) >> 4;
+    
+    if (V[x] != V[y]) pc += 2;
+}
+
+inline void Chip8::handleSetIndex(uint16_t opcode) {
+    I = opcode & 0x0FFF; // store 12 bit address [ 0x000–0xFFF ]  in memory register. 
+}
+
+
+void Chip8::handleSkipIfEqualByte(uint16_t opcode) {
+    uint8_t x  = (opcode & 0x0F00) >> 8;
+    uint8_t nn = opcode & 0x00FF;
+
+    if (V[x] == nn) {
+        pc += 2;
+    }
+}
+void Chip8::handleSkipIfNotEqualByte(uint16_t opcode) {
+    uint8_t x  = (opcode & 0x0F00) >> 8;
+    uint8_t nn = opcode & 0x00FF;
+
+    if (V[x] != nn) {
+        pc += 2;
+    }
+}
+
+void Chip8::handleKeyInput(uint16_t opcode) {
+    switch (opcode & 0x00FF) {
+
+       case 0x9E: SkipKeyIfVXIsPressed(opcode); break;
+       case 0xA1: SkipKeyIfVXIsNotPressed(opcode); break;
+    }
+}
+
+void Chip8::SkipKeyIfVXIsPressed(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+
+    if(keypad[V[x]]) {
+        pc += 2;
+    }
+}
+
+void Chip8::SkipKeyIfVXIsNotPressed(uint16_t opcode) {
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    if(!keypad[V[x]]) {
+        pc += 2;
+    }
+}
+
+
+void Chip8::DrawToScreen(uint16_t opcode) {
+    // 0xD000
+    uint8_t x = (opcode & 0X0F00) >> 8;
+    uint8_t y = (opcode & 0X00F0) >> 4;
+    uint8_t n = (opcode & 0x000F);
+
+    uint8_t xPos = V[x];
+    uint8_t yPos = V[y];
+
+    V[0xF] = 0;
+
+    for(int row = 0; row < n; row++) {
+        uint8_t sprite = memory[I + row];
+
+        for (int col = 0; col < 8; col++) {
+            if (sprite & (0x80 >> col)) {
+
+                int px = (xPos + col) % SCREEN_WIDTH;
+                int py = (yPos + row) % SCREEN_HEIGHT;
+                int idx = px + py * SCREEN_WIDTH;
+
+                if (gfx[idx])
+                    V[0xF] = 1; // visited something on screen.
+
+                gfx[idx] ^= 1; // flip pixel on/off
+            }
+        }
+    }
+}
+
 
 void Chip8::cycle() {
 
@@ -195,5 +244,5 @@ void Chip8::debug_render() {
 }
 
 Chip8::Chip8() {
-        init();
+    init();
 }

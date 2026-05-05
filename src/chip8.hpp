@@ -14,6 +14,25 @@ public:
     void loadROM(const std::string& filename);
     void cycle();
     void debug_render();
+    // for opcodes
+    void handleJump(uint16_t opcode);
+    void handleSubRoutine(uint16_t opcode);
+    void handleSkipIfEqualByte(uint16_t opcode);
+    void handleSkipIfNotEqualByte(uint16_t opcode);
+    void handleSkipIfRegisterEqual(uint16_t opcode);
+    void handleSetRegister(uint16_t opcode);
+    void handleAddToRegister(uint16_t opcode);
+    void handle0Group(uint16_t opcode);
+    void handleSkipIfRegisterNotEqual(uint16_t opcode);
+    void handleSetIndex(uint16_t opcode);
+    void DrawToScreen(uint16_t opcode);
+    void handleKeyInput(uint16_t opcode);
+    void SkipKeyIfVXIsPressed(uint16_t opcode);
+    void SkipKeyIfVXIsNotPressed(uint16_t opcode);
+    void WaitForKeyPress(uint16_t opcode);
+    
+
+
 
     static constexpr std::size_t SCREEN_WIDTH = 64;
     static constexpr std::size_t SCREEN_HEIGHT = 32;
@@ -23,14 +42,14 @@ public:
     static constexpr std::size_t NUM_REGISTERS = 16;
     static constexpr std::size_t STACK_SIZE = 16;
 
-    std::array<uint8_t, SCREEN_SIZE> gfx{}; // fix magic number
+    std::array<uint8_t, SCREEN_SIZE> gfx; // fix magic number
 
-    std::array<uint8_t, NUM_KEYS> keypad{}; // keypad[0x0] = 0, keypad[0xA] = A etc.. 0 not pressed, 1 pressed
+    std::array<uint8_t, NUM_KEYS> keypad; // keypad[0x0] = 0, keypad[0xA] = A etc.. 0 not pressed, 1 pressed
 
 private:
-    std::array<uint16_t, STACK_SIZE> stack{};
-    std::array<uint8_t, MEMORY_SIZE> memory{}; // 4096 bytes | 0x000-0xFFF |
-    std::array<uint8_t, NUM_REGISTERS> V{}; // V[0x0-F], E Flag, F Special, 16 registers
+    std::array<uint16_t, STACK_SIZE> stack;
+    std::array<uint8_t, MEMORY_SIZE> memory; // 4096 bytes | 0x000-0xFFF |
+    std::array<uint8_t, NUM_REGISTERS> V; // V[0x0-F], E Flag, F Special, 16 registers
 	
     static constexpr std::array<uint8_t, 80> fontset = {
     0xF0, 0x90, 0x90, 0x90, 0xF0, // 0

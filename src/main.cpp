@@ -6,7 +6,7 @@ int main() {
 
     chip.init();
     chip.loadROM("/Users/frank/chip8/roms/ibm_logo.ch8");
-
+   // chip.loadROM("/Users/frank/chip8/roms/3-corax+.80");
     std::cout << "CHIP-8 starting...\n";
 
     while (true) {

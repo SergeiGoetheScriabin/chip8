@@ -1,6 +1,8 @@
 #include "chip8.hpp"
 #include <fstream>
 #include <iostream>
+#include <cstdlib>
+#include <ctime>
 
 void Chip8::init()
 {
@@ -22,6 +24,9 @@ void Chip8::init()
     {
         memory[0x50 + i] = fontset[i];
     }
+
+    rom_loaded = false;
+    draw_flag = false;
 }
 
 void Chip8::loadROM(const std::string &filename)
@@ -51,7 +56,6 @@ void Chip8::loadROM(const std::string &filename)
 
 void Chip8::exec_opcode(uint16_t opcode)
 {
-
     switch (opcode & 0xF000)
     {
 
@@ -63,12 +67,12 @@ void Chip8::exec_opcode(uint16_t opcode)
     // 1NNN - JP addr: unconditional jump to address NNN
     case 0x1000:
         handleJump(opcode);
-        break;
+        return; // skip pc += 2, jump sets pc directly
 
-    // 2NN - call subroutine
+    // 2NNN - call subroutine
     case 0x2000:
         handleSubRoutine(opcode);
-        break;
+        return; // skip pc += 2, subroutine sets pc directly
 
     // 3XNN - Skip if Vx equals a number.
     case 0x3000:
@@ -95,6 +99,10 @@ void Chip8::exec_opcode(uint16_t opcode)
         handleAddToRegister(opcode);
         break;
 
+    case 0x8000:
+        handle8Group(opcode);
+        break;
+
     // 9XY0 - skip next instruction if Vx does NOT equal Vy
     case 0x9000:
         handleSkipIfRegisterNotEqual(opcode);
@@ -103,6 +111,16 @@ void Chip8::exec_opcode(uint16_t opcode)
     // ANNN - set I to an address
     case 0xA000:
         handleSetIndex(opcode);
+        break;
+
+    // BNNN - jump with offset
+    case 0xB000:
+        pc = (opcode & 0x0FFF) + V[0];
+        return; // skip pc += 2
+
+    // CXNN - random
+    case 0xC000:
+        V[(opcode & 0x0F00) >> 8] = (std::rand() % 256) & (opcode & 0xFF);
         break;
 
     // DXYN - draw sprite
@@ -131,24 +149,45 @@ inline void Chip8::handle0Group(uint16_t opcode)
     if (opcode == 0x00E0)
     {
         gfx.fill(0); // clear screen by setting all pixels to 0.
+        draw_flag = true;
     }
     else if (opcode == 0x00EE)
     {
         // 00EE - RET: return from subroutine
         sp--;
         pc = stack[sp];
-        return; // one of only cases we override pc in main loop.
+        // don't increment pc, return address already points to next instruction
+    }
+}
+
+inline void Chip8::handle8Group(uint16_t opcode)
+{
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t y = (opcode & 0x00F0) >> 4;
+
+    switch (opcode & 0x000F)
+    {
+        case 0x0: V[x]  = V[y]; break;
+        case 0x1: V[x] |= V[y]; break;
+        case 0x2: V[x] &= V[y]; break;
+        case 0x3: V[x] ^= V[y]; break;
+        case 0x4: { uint16_t r = V[x] + V[y]; V[0xF] = r > 0xFF; V[x] = r & 0xFF; break; }
+        case 0x5: { uint8_t vf = V[x] > V[y]; V[x] -= V[y]; V[0xF] = vf; break; }
+        case 0x6: { uint8_t vf = V[x] & 0x1; V[x] >>= 1; V[0xF] = vf; break; }
+        case 0x7: { uint8_t vf = V[y] > V[x]; V[x] = V[y] - V[x]; V[0xF] = vf; break; }
+        case 0xE: { uint8_t vf = (V[x] >> 7) & 1; V[x] <<= 1; V[0xF] = vf; break; }
     }
 }
 
 inline void Chip8::handleFGroup(uint16_t opcode)
 {
-
     switch (opcode & 0x00FF)
     {
-
     case 0x07:
         setVXToDelayTimer(opcode);
+        break;
+    case 0x0A:
+        WaitForKeyPress(opcode);
         break;
     case 0x15:
         setDelayTimerFromVX(opcode);
@@ -156,7 +195,6 @@ inline void Chip8::handleFGroup(uint16_t opcode)
     case 0x18:
         setSoundTimerFromVX(opcode);
         break;
-
     case 0x1E:
         addVXToIndex(opcode);
         break;
@@ -172,7 +210,6 @@ inline void Chip8::handleFGroup(uint16_t opcode)
     case 0x65:
         loadV0ToVXFromMemory(opcode);
         break;
-
     default:
         break;
     }
@@ -255,7 +292,6 @@ inline void Chip8::handleKeyInput(uint16_t opcode)
 {
     switch (opcode & 0x00FF)
     {
-
     case 0x9E:
         SkipKeyIfVXIsPressed(opcode);
         break;
@@ -284,11 +320,21 @@ inline void Chip8::SkipKeyIfVXIsNotPressed(uint16_t opcode)
     }
 }
 
+inline void Chip8::WaitForKeyPress(uint16_t opcode)
+{
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    for (int i = 0; i < 16; i++)
+    {
+        if (keypad[i]) { V[x] = i; return; }
+    }
+    pc -= 2; // no key pressed, re-run this instruction next cycle
+}
+
 inline void Chip8::DrawToScreen(uint16_t opcode)
 {
     // 0xD000
-    uint8_t x = (opcode & 0X0F00) >> 8;
-    uint8_t y = (opcode & 0X00F0) >> 4;
+    uint8_t x = (opcode & 0x0F00) >> 8;
+    uint8_t y = (opcode & 0x00F0) >> 4;
     uint8_t n = (opcode & 0x000F);
 
     uint8_t xPos = V[x];
@@ -304,7 +350,6 @@ inline void Chip8::DrawToScreen(uint16_t opcode)
         {
             if (sprite & (0x80 >> col))
             {
-
                 int px = (xPos + col) % SCREEN_WIDTH;
                 int py = (yPos + row) % SCREEN_HEIGHT;
                 int idx = px + py * SCREEN_WIDTH;
@@ -316,6 +361,8 @@ inline void Chip8::DrawToScreen(uint16_t opcode)
             }
         }
     }
+
+    draw_flag = true;
 }
 
 // fx07 delay timer
@@ -332,7 +379,7 @@ inline void Chip8::setDelayTimerFromVX(uint16_t opcode)
     delay_timer = V[x];
 }
 
-// fx 18 delay timer
+// fx18 sound timer
 inline void Chip8::setSoundTimerFromVX(uint16_t opcode)
 {
     uint8_t x = (opcode & 0x0F00) >> 8;
@@ -346,25 +393,25 @@ inline void Chip8::addVXToIndex(uint16_t opcode)
     I += V[x];
 }
 
-// fx 29  - font sprite address
+// fx29 - font sprite address
 inline void Chip8::setIndexToFontSpriteForVX(uint16_t opcode)
 {
     uint8_t x = (opcode & 0x0F00) >> 8;
     I = 0x50 + (V[x] * 5);
 }
 
-// fx 33 - bcd store
+// fx33 - bcd store
 inline void Chip8::storeVXAsBCD(uint16_t opcode)
 {
     uint8_t x = (opcode & 0x0F00) >> 8;
     uint8_t value = V[x];
 
-    memory[I] = value / 100;
+    memory[I]     = value / 100;
     memory[I + 1] = (value / 10) % 10;
     memory[I + 2] = value % 10;
 }
 
-// fx 55 - store V0-VX in memory
+// fx55 - store V0-VX in memory
 inline void Chip8::storeV0ToVXToMemory(uint16_t opcode)
 {
     uint8_t x = (opcode & 0x0F00) >> 8;
@@ -375,7 +422,7 @@ inline void Chip8::storeV0ToVXToMemory(uint16_t opcode)
     }
 }
 
-// fx 65 - load v0-vx from memory
+// fx65 - load v0-vx from memory
 inline void Chip8::loadV0ToVXFromMemory(uint16_t opcode)
 {
     uint8_t x = (opcode & 0x0F00) >> 8;
@@ -388,7 +435,6 @@ inline void Chip8::loadV0ToVXFromMemory(uint16_t opcode)
 
 void Chip8::cycle()
 {
-
     if (!rom_loaded)
         return;
     if (pc + 1 >= MEMORY_SIZE)
@@ -397,11 +443,6 @@ void Chip8::cycle()
     uint16_t opcode = (memory[pc] << 8) | memory[pc + 1];
 
     exec_opcode(opcode);
-
-    if (delay_timer > 0)
-        --delay_timer;
-    if (sound_timer > 0)
-        --sound_timer;
 }
 
 void Chip8::debug_render()
@@ -418,7 +459,14 @@ void Chip8::debug_render()
     }
 }
 
+void Chip8::tickTimers()
+{
+    if (delay_timer > 0) --delay_timer;
+    if (sound_timer > 0) --sound_timer;
+}
+
 Chip8::Chip8()
 {
+    std::srand(std::time(nullptr));
     init();
 }

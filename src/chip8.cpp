@@ -61,7 +61,9 @@ void Chip8::exec_opcode(uint16_t opcode)
 
     // 00E0 / 00EE
     case 0x0000:
+
         handle0Group(opcode);
+        if(opcode == 0x00EE) return;
         break;
 
     // 1NNN - JP addr: unconditional jump to address NNN

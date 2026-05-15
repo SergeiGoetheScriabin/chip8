@@ -67,4 +67,8 @@ gfx size of gfxRow by gfxCol
 -8XY5: Subtract: 8XY5 sets VX to result of VX - VY
 -8XY7: Subtract: 8XY7 sets VX to result of VY - VX
 
+
+
+random notes - every instruction pc += 2, if we jump/call/return manually set pc and return
+// skip is += 2
 -8XY6: Shift: set VX to the value of VY, shift the value of VX one bit to the right of 8XY6 or left of 8XY3
